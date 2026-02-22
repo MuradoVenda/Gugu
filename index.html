@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Gem Math Master</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --primary: #FF9800; --secondary: #4CAF50; --bg: #2D4C3E; --error: #F44336; }
+        body { 
+            font-family: 'Nunito', sans-serif; background-color: var(--bg); margin: 0; 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; overflow: hidden; touch-action: manipulation; 
+        }
+        .app-container { 
+            background: white; border-radius: 25px; width: 94%; max-width: 500px; 
+            height: 94vh; max-height: 820px; 
+            display: flex; flex-direction: column; 
+            padding: 12px 15px; box-shadow: 0 15px 40px rgba(0,0,0,0.4); box-sizing: border-box;
+        }
+
+        /* ⭐ 시각적 배치 영역 (중앙 정렬) */
+        .visual-area {
+            display: flex; justify-content: center; align-items: flex-end;
+            min-height: 100px; margin-top: 30px; margin-bottom: 10px;
+            position: relative; flex-shrink: 0;
+        }
+
+        /* 🏃‍♂️ 계단: 테스트 모드에서 중앙 위치 */
+        .stair-container {
+            height: 65px; width: 220px; position: relative;
+            display: none; flex-shrink: 0; overflow: visible;
+        }
+        .stair { position: absolute; bottom: 0; background: #eee; width: 18px; border-radius: 4px 4px 0 0; }
+        .runner {
+            position: absolute; bottom: 0; left: 0; font-size: 26px;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10; transform: scaleX(-1); /* 방향 유지 */
+        }
+        .runner.fall { animation: fallAnim 0.8s forwards; }
+        @keyframes fallAnim {
+            0% { transform: scaleX(-1) translateY(0) rotate(0); opacity: 1; }
+            100% { transform: scaleX(-1) translateY(120px) rotate(180deg); opacity: 0; }
+        }
+
+        /* 👀 눈동자: 트레이닝 시 상단 중앙, 테스트 시 계단 옆 */
+        .character-box { 
+            display: flex; justify-content: center; align-items: center; 
+            gap: 10px; flex-shrink: 0; transition: all 0.3s;
+        }
+        .eye { width: 38px; height: 38px; background: white; border: 3px solid #333; border-radius: 50%; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .pupil { width: 16px; height: 16px; background: #333; border-radius: 50%; position: absolute; transition: 0.2s; }
+        
+        /* ⭐ 테스트 모드용 레이아웃 (눈동자가 옆에서 사람을 봄) */
+        .test-layout .visual-area { gap: 15px; }
+        .test-layout .character-box { margin-bottom: 10px; }
+        .test-layout .pupil { transform: translate(8px, 2px); } /* 오른쪽 옆 주자 응시 */
+
+        .eye.heart::before { content: '❤️'; font-size: 24px; position: absolute; z-index: 2; animation: pop 0.3s; }
+        .eye.spin .pupil { width: 30px; height: 30px; background: repeating-conic-gradient(#333 0 90deg, #fff 0 180deg); animation: rotateSpin 0.2s infinite linear; }
+        @keyframes rotateSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+        .screen { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .screen.active { display: flex; }
+
+        /* UI 정렬 */
+        .grid-9 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .btn-table { aspect-ratio: 1/1; font-family: 'Fredoka One'; font-size: 0.95rem; border: none; border-radius: 15px; background: #f0f0f0; cursor: pointer; box-shadow: 0 4px 0 #ddd; }
+        .btn-table.unlocked { background: var(--primary); color: white; box-shadow: 0 4px 0 #E68A00; }
+
+        .quiz-box { text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; }
+        .question { font-size: 3rem; font-family: 'Fredoka One'; color: var(--bg); margin-bottom: 5px; }
+        .display-ans { font-size: 2.2rem; height: 45px; color: var(--secondary); font-family: 'Fredoka One'; border-bottom: 3px solid #eee; min-width: 80px; text-align: center; margin-bottom: 10px; }
+
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 320px; }
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; max-width: 280px; }
+        .key { padding: 12px; font-size: 1.4rem; font-weight: 900; background: #f8f8f8; border: none; border-radius: 12px; box-shadow: 0 4px 0 #ddd; cursor: pointer; }
+        .key.submit { background: var(--secondary); color: white; box-shadow: 0 4px 0 #2E7D32; grid-column: span 2; }
+
+        .nav-controls { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; flex-shrink: 0; }
+        .btn-nav { padding: 12px; border: none; border-radius: 12px; font-weight: 800; cursor: pointer; background: #eee; flex: 1; font-size: 0.9rem; }
+        
+        .feedback-text { height: 25px; text-align: center; font-size: 1rem; font-weight: 800; margin: 5px 0; }
+        .progress-dots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background: #ddd; }
+        .dot.active { background: var(--secondary); transform: scale(1.1); }
+    </style>
+</head>
+<body onmousedown="initAudio()" ontouchstart="initAudio()">
+
+<div class="app-container" id="main-app">
+    <div class="visual-area" id="visual-area">
+        <div class="character-box" id="character-eyes">
+            <div class="eye" id="eyeL"><div class="pupil"></div></div>
+            <div class="eye" id="eyeR"><div class="pupil"></div></div>
+        </div>
+        <div class="stair-container" id="stair-box">
+            <div class="runner" id="runner">🏃</div>
+        </div>
+    </div>
+
+    <div id="screen-main" class="screen active">
+        <h2 style="text-align:center; color: var(--bg); margin: 5px 0;">Gem Math Master 💎</h2>
+        <div class="grid-9" id="table-grid"></div>
+        <button class="btn-nav" style="margin-top:20px" onclick="resetData()">Reset All Badges</button>
+    </div>
+
+    <div id="screen-mode" class="screen">
+        <h2 id="selected-table-title" style="text-align:center; font-size: 1.6rem; margin: 15px 0;">Table</h2>
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px;">
+            <button class="key submit" style="padding:18px;" onclick="startMode('training')">🎓 TRAINING</button>
+            <button class="key submit" style="padding:18px; background: var(--primary); box-shadow: 0 4px 0 #E68A00;" onclick="startMode('test')">🏆 TEST (10 Qs)</button>
+        </div>
+        <button class="btn-nav" onclick="showScreen('main')">Go Back</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div class="quiz-box">
+            <div class="progress-dots" id="dots-container"></div>
+            <div class="question" id="q-text"></div>
+            <div class="display-ans" id="user-input-display">?</div>
+            <div class="keypad" id="custom-keypad" style="display:none;">
+                <button class="key" onclick="pressKey(1)">1</button><button class="key" onclick="pressKey(2)">2</button><button class="key" onclick="pressKey(3)">3</button>
+                <button class="key" onclick="pressKey(4)">4</button><button class="key" onclick="pressKey(5)">5</button><button class="key" onclick="pressKey(6)">6</button>
+                <button class="key" onclick="pressKey(7)">7</button><button class="key" onclick="pressKey(8)">8</button><button class="key" onclick="pressKey(9)">9</button>
+                <button class="key" onclick="pressKey('del')">⌫</button><button class="key" onclick="pressKey(0)">0</button>
+                <button class="key submit" onclick="submitAnswer()">CHECK</button>
+            </div>
+            <div class="options-grid" id="options-area" style="display:none;"></div>
+        </div>
+        <div class="feedback-text" id="feedback"></div>
+        <div class="nav-controls">
+            <button class="btn-nav" onclick="showScreen('mode')">BACK</button>
+            <button class="btn-nav" onclick="showScreen('main')">QUIT</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentTable = 0; let currentMode = ''; let correctAnswer = 0; let score = 0;
+    let userInput = ""; let testQuestions = []; const GOAL = 10;
+    const badges = JSON.parse(localStorage.getItem('mathBadges')) || {};
+    let audioCtx = null;
+
+    // 🔊 사운드 활성화 (아이패드/iOS 호환)
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator(); 
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'correct') {
+            osc.frequency.setValueAtTime(520, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        } else {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+        }
+    }
+
+    function initStairs() {
+        const box = document.getElementById('stair-box');
+        box.querySelectorAll('.stair').forEach(s => s.remove());
+        for (let i = 0; i <= GOAL; i++) {
+            const s = document.createElement('div');
+            s.className = 'stair';
+            s.style.left = (i * 20) + 'px';
+            s.style.height = (i * 4 + 4) + 'px';
+            box.appendChild(s);
+        }
+    }
+
+    function moveRunner(step, isFall = false) {
+        const runner = document.getElementById('runner');
+        runner.classList.remove('fall');
+        if (isFall) {
+            runner.classList.add('fall');
+            setTimeout(() => { runner.classList.remove('fall'); moveRunner(0); }, 800);
+            return;
+        }
+        runner.style.left = (step * 20) + 'px';
+        runner.style.bottom = (step * 4 + 4) + 'px';
+    }
+
+    function updateEyes(status) {
+        const app = document.getElementById('main-app');
+        document.querySelectorAll('.eye').forEach(e => {
+            e.className = 'eye';
+            if (status === 'heart') e.classList.add('heart');
+            else if (status === 'spin') e.classList.add('spin');
+        });
+        if (currentMode === 'test') app.classList.add('test-layout');
+        else app.classList.remove('test-layout');
+    }
+
+    function initMenu() {
+        const grid = document.getElementById('table-grid'); grid.innerHTML = '';
+        for (let i = 1; i <= 9; i++) {
+            const btn = document.createElement('button');
+            btn.className = `btn-table ${badges[i] ? 'unlocked' : ''}`;
+            btn.innerHTML = `Table ${i} ${badges[i] ? '💎' : ''}`;
+            btn.onclick = () => { currentTable = i; showScreen('mode'); };
+            grid.appendChild(btn);
+        }
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(`screen-${id}`).classList.add('active');
+        document.getElementById('stair-box').style.display = (id === 'game' && currentMode === 'test') ? 'block' : 'none';
+        updateEyes('looking');
+        if (id === 'main') initMenu();
+    }
+
+    function startMode(mode) {
+        currentMode = mode; score = 0; userInput = "";
+        if (mode === 'test') {
+            testQuestions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].sort(() => Math.random() - 0.5);
+            initStairs(); moveRunner(0);
+            document.getElementById('custom-keypad').style.display = 'grid';
+            document.getElementById('user-input-display').style.display = 'block';
+            document.getElementById('options-area').style.display = 'none';
+        } else {
+            document.getElementById('custom-keypad').style.display = 'none';
+            document.getElementById('user-input-display').style.display = 'none';
+            document.getElementById('options-area').style.display = 'grid';
+        }
+        showScreen('game'); updateProgress(); nextQuestion();
+    }
+
+    function updateProgress() {
+        const container = document.getElementById('dots-container'); container.innerHTML = '';
+        if (currentMode === 'test') {
+            for (let i = 0; i < GOAL; i++) {
+                const dot = document.createElement('div');
+                dot.className = `dot ${i < score ? 'active' : ''}`;
+                container.appendChild(dot);
+            }
+        }
+    }
+
+    function nextQuestion() {
+        updateEyes('looking'); document.getElementById('feedback').innerText = '';
+        userInput = ""; document.getElementById('user-input-display').innerText = "?";
+        let mult = (currentMode === 'test') ? testQuestions[score] : Math.floor(Math.random() * 9) + 1;
+        correctAnswer = currentTable * mult;
+        document.getElementById('q-text').innerText = `${currentTable} × ${mult}`;
+        if (currentMode === 'training') generateOptions();
+    }
+
+    function pressKey(key) {
+        if (key === 'del') userInput = userInput.slice(0, -1);
+        else if (userInput.length < 3) userInput += key;
+        document.getElementById('user-input-display').innerText = userInput || "?";
+    }
+
+    function submitAnswer() { if (userInput !== "") handleAnswer(parseInt(userInput)); }
+
+    function generateOptions() {
+        const area = document.getElementById('options-area'); area.innerHTML = '';
+        let opts = [correctAnswer];
+        while (opts.length < 4) {
+            let fake = currentTable * (Math.floor(Math.random() * 9) + 1);
+            if (!opts.includes(fake)) opts.push(fake);
+        }
+        opts.sort(() => Math.random() - 0.5).forEach(o => {
+            const b = document.createElement('button'); b.className = 'key'; b.innerText = o;
+            b.onclick = () => handleAnswer(o); area.appendChild(b);
+        });
+    }
+
+    function handleAnswer(ans) {
+        if (ans === correctAnswer) {
+            playSound('correct'); updateEyes('heart');
+            document.getElementById('feedback').innerText = "EXCELLENT! ❤️";
+            document.getElementById('feedback').style.color = "var(--secondary)";
+            score++; updateProgress();
+            if (currentMode === 'test') moveRunner(score);
+            if (currentMode === 'test' && score >= GOAL) {
+                badges[currentTable] = true; localStorage.setItem('mathBadges', JSON.stringify(badges));
+                confetti({ particleCount: 200, spread: 80, origin: { y: 0.6 } });
+                setTimeout(() => { alert("AMAZING! Table " + currentTable + " Cleared! 💎"); showScreen('main'); }, 1200);
+            } else { setTimeout(nextQuestion, 800); }
+        } else {
+            playSound('wrong'); updateEyes('spin');
+            document.getElementById('feedback').innerText = "Falling Down! 💨";
+            document.getElementById('feedback').style.color = "var(--error)";
+            if (currentMode === 'test') {
+                moveRunner(score, true);
+                score = 0; testQuestions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].sort(() => Math.random() - 0.5);
+                updateProgress(); userInput = ""; document.getElementById('user-input-display').innerText = "?";
+                setTimeout(() => { nextQuestion(); }, 1200);
+            }
+        }
+    }
+
+    function resetData() { if (confirm("Reset all badges?")) { localStorage.clear(); location.reload(); } }
+    initMenu();
+</script>
+</body>
+</html>
